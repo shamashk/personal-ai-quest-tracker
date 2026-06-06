@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PATH OF THE AI ARCHITECT — Quest Tracker (Cloud Sync)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --bg:#0a0c11;--bg2:#0e1118;--panel:#13171f;--panel2:#171c26;
+    --border:#262d3a;--border-bright:#33405a;--text:#cdd6e4;--muted:#6d7787;
+    --gold:#ffb627;--gold-dim:#7a5a1d;--cyan:#4fd1c5;--green:#5ed47a;--red:#ff5d5d;--violet:#9b8cff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'JetBrains Mono',monospace;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  body{background-image:
+      radial-gradient(circle at 18% -10%, rgba(255,182,39,.07), transparent 40%),
+      radial-gradient(circle at 90% 0%, rgba(79,209,197,.06), transparent 45%),
+      linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+    background-size:auto,auto,38px 38px,38px 38px;background-attachment:fixed}
+  .wrap{max-width:920px;margin:0 auto;padding:20px 18px 90px}
+  .pixel{font-family:'Silkscreen',monospace;letter-spacing:.5px}
+
+  /* CLOUD SYNC BAR */
+  .syncbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    border:1px solid var(--border-bright);border-radius:10px;padding:11px 14px;margin-bottom:16px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel))}
+  .syncdot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:0 0 auto;
+    box-shadow:0 0 0 0 rgba(0,0,0,0)}
+  .syncdot.local{background:var(--muted)}
+  .syncdot.connecting{background:var(--gold);animation:pulse 1s infinite}
+  .syncdot.synced{background:var(--green);box-shadow:0 0 10px rgba(94,212,122,.6)}
+  .syncdot.syncing{background:var(--cyan);animation:pulse .8s infinite}
+  .syncdot.error{background:var(--red);box-shadow:0 0 10px rgba(255,93,93,.6)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .syncmsg{font-size:12px;color:var(--muted);flex:1;min-width:140px}
+  .syncmsg b{color:var(--text)}
+  .sbtn{font-family:'JetBrains Mono';font-size:11.5px;cursor:pointer;border:1px solid var(--border-bright);
+    background:var(--bg2);color:var(--text);padding:7px 13px;border-radius:6px;transition:.15s;white-space:nowrap}
+  .sbtn:hover{border-color:var(--cyan);color:var(--cyan)}
+  .sbtn.primary{border-color:var(--gold-dim);color:var(--gold)}
+  .sbtn.primary:hover{border-color:var(--gold);box-shadow:0 0 14px -4px rgba(255,182,39,.5)}
+
+  /* SETUP PANEL */
+  .setup{border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:16px;overflow:hidden;display:none}
+  .setup.show{display:block}
+  .setup .sh{padding:12px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(155,140,255,.08),transparent)}
+  .setup .sh .pixel{font-size:11px;color:var(--violet)}
+  .setup .sb{padding:14px 16px}
+  .setup ol{margin:0 0 12px;padding-left:20px}
+  .setup li{font-size:12.5px;margin:7px 0;color:var(--text)}
+  .setup li code{background:#0a0d13;border:1px solid var(--border);padding:1px 6px;border-radius:4px;color:var(--gold);font-size:11.5px}
+  .setup a{color:var(--cyan)}
+  .cidrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .cidrow input{flex:1;min-width:220px;background:#0a0d13;border:1px solid var(--border-bright);color:var(--text);
+    font-family:'JetBrains Mono';font-size:12px;padding:9px 11px;border-radius:6px}
+  .cidrow input:focus{outline:none;border-color:var(--cyan)}
+  .note{font-size:11.5px;color:var(--muted);margin-top:10px;border-left:2px solid var(--gold-dim);padding-left:10px}
+
+  /* HEADER / CHARACTER PANEL */
+  header.hud{border:1px solid var(--border-bright);background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border-radius:10px;padding:20px 20px 18px;position:relative;overflow:hidden;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 18px 50px -28px rgba(0,0,0,.9)}
+  header.hud::before{content:"";position:absolute;inset:0;background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 2px,transparent 2px 4px);pointer-events:none;opacity:.5}
+  .game-title{font-size:11px;color:var(--gold);text-transform:uppercase}
+  .game-sub{color:var(--muted);font-size:12px;margin-top:3px}
+  .charline{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-top:16px;flex-wrap:wrap}
+  .lvl-badge{display:flex;align-items:center;gap:14px}
+  .lvl-num{font-family:'Silkscreen';font-size:34px;color:var(--gold);text-shadow:0 0 18px rgba(255,182,39,.4);line-height:1}
+  .lvl-meta .pixel{font-size:13px;color:var(--text)}
+  .lvl-meta .rank{color:var(--cyan);font-size:12px;margin-top:5px;letter-spacing:1px;text-transform:uppercase}
+  .streak{text-align:right}
+  .streak .flame{font-family:'Silkscreen';font-size:26px;color:var(--red);line-height:1}
+  .streak small{display:block;color:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase;margin-top:4px}
+  .xpwrap{margin-top:18px}
+  .xprow{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .xprow b{color:var(--gold)}
+  .xpbar{height:16px;border:1px solid var(--border-bright);border-radius:4px;background:#0a0d13;overflow:hidden;position:relative}
+  .xpfill{height:100%;width:0;background:linear-gradient(90deg,#c47f12,var(--gold) 70%,#ffe39c);
+    transition:width .7s cubic-bezier(.2,.9,.2,1);box-shadow:0 0 14px rgba(255,182,39,.55);background-size:24px 24px}
+
+  /* WEEKLY ENGINE */
+  .engine{margin-top:22px;border:1px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden}
+  .engine .ehead{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;
+    background:linear-gradient(180deg,rgba(79,209,197,.08),transparent)}
+  .engine .ehead .pixel{font-size:11px;color:var(--cyan)}
+  .engine .ebody{padding:14px 16px}
+  .loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px}
+  .loop .lcard{border:1px solid var(--border);border-radius:8px;padding:11px 12px;background:var(--bg2)}
+  .loop .lcard .d{font-family:'Silkscreen';font-size:9px;color:var(--gold);letter-spacing:1px}
+  .loop .lcard p{margin:6px 0 0;font-size:12.5px;color:var(--text)}
+  .logbtn{font-family:'Silkscreen';font-size:11px;cursor:pointer;border:1px solid var(--gold-dim);
+    background:linear-gradient(180deg,#1d1809,#120e05);color:var(--gold);padding:11px 16px;border-radius:7px;
+    letter-spacing:.5px;transition:.18s;width:100%}
+  .logbtn:hover{border-color:var(--gold);box-shadow:0 0 18px -4px rgba(255,182,39,.5);transform:translateY(-1px)}
+  .logbtn.done{opacity:.5;cursor:default;color:var(--green);border-color:#2a4a32}
+  .logbtn.done:hover{transform:none;box-shadow:none}
+
+  /* ACTS */
+  .act{margin-top:26px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
+  .act-head{padding:15px 18px;cursor:pointer;display:flex;align-items:center;gap:14px;
+    background:linear-gradient(180deg,var(--panel2),var(--panel));position:relative;user-select:none}
+  .act-head:hover{background:var(--panel2)}
+  .act-zone{font-family:'Silkscreen';font-size:9px;color:var(--muted);letter-spacing:1px}
+  .act-name{font-family:'Silkscreen';font-size:14px;color:var(--gold);margin-top:5px}
+  .act-when{font-size:11px;color:var(--muted);margin-top:5px}
+  .act-prog{margin-left:auto;text-align:right;min-width:90px}
+  .act-prog .pct{font-family:'Silkscreen';font-size:15px;color:var(--cyan)}
+  .act-prog .cnt{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+  .chev{transition:.25s;color:var(--muted);font-size:13px}
+  .act.open .chev{transform:rotate(90deg)}
+  .act-body{display:none;padding:6px 14px 16px;border-top:1px solid var(--border)}
+  .act.open .act-body{display:block;animation:slidein .3s ease}
+  @keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .act.locked{opacity:.62}
+  .lockmsg{font-size:11.5px;color:var(--muted);padding:14px;text-align:center;font-style:italic}
+  .month-label{font-family:'Silkscreen';font-size:9px;color:var(--violet);letter-spacing:1px;
+    margin:16px 4px 8px;text-transform:uppercase;border-bottom:1px dashed var(--border);padding-bottom:7px}
+
+  /* QUEST CARD */
+  .quest{border:1px solid var(--border);border-radius:9px;margin:8px 0;background:var(--bg2);transition:.18s;overflow:hidden}
+  .quest:hover{border-color:var(--border-bright)}
+  .quest.boss{border-color:var(--gold-dim);background:linear-gradient(180deg,rgba(255,182,39,.045),var(--bg2))}
+  .quest.done{border-color:#244a30;background:linear-gradient(180deg,rgba(94,212,122,.05),var(--bg2))}
+  .q-head{display:flex;align-items:flex-start;gap:12px;padding:12px 13px;cursor:pointer}
+  .check{flex:0 0 auto;width:22px;height:22px;border:2px solid var(--border-bright);border-radius:5px;margin-top:1px;
+    display:flex;align-items:center;justify-content:center;font-size:13px;color:transparent;transition:.15s;background:#0a0d13}
+  .quest.done .check{background:var(--green);border-color:var(--green);color:#06140a}
+  .quest.boss .check{border-color:var(--gold-dim)}
+  .quest.boss.done .check{background:var(--gold);border-color:var(--gold)}
+  .q-main{flex:1;min-width:0}
+  .q-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .quest.done .q-title{color:var(--muted);text-decoration:line-through;text-decoration-color:#2c5a3a}
+  .tag{font-family:'Silkscreen';font-size:8px;padding:3px 6px;border-radius:4px;letter-spacing:.5px;border:1px solid;vertical-align:middle}
+  .tag.boss{color:var(--gold);border-color:var(--gold-dim);background:rgba(255,182,39,.08)}
+  .tag.xp{color:var(--cyan);border-color:#1f4540;background:rgba(79,209,197,.08)}
+  .q-obj{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .q-toggle{flex:0 0 auto;color:var(--muted);font-size:11px;margin-top:3px;transition:.2s}
+  .quest.expanded .q-toggle{transform:rotate(90deg)}
+  .q-detail{display:none;padding:0 14px 14px 47px}
+  .quest.expanded .q-detail{display:block;animation:slidein .25s ease}
+  .dsec{margin-top:12px}
+  .dsec .dlabel{font-family:'Silkscreen';font-size:8px;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+  .dsec.look .dlabel{color:var(--cyan)}
+  .dsec.win .dlabel{color:var(--green)}
+  .dsec ul{margin:0;padding-left:17px}
+  .dsec li{font-size:12.5px;margin:3px 0;color:var(--text)}
+  .dsec li code{background:#0a0d13;border:1px solid var(--border);padding:1px 6px;border-radius:4px;color:var(--gold);font-size:11.5px}
+  .win-box{font-size:12.5px;color:var(--text);background:rgba(94,212,122,.06);border:1px solid #244a30;
+    border-left:3px solid var(--green);padding:9px 11px;border-radius:5px}
+
+  /* TRAPS */
+  .traps{margin-top:26px;border:1px solid #4a2626;border-radius:10px;background:linear-gradient(180deg,rgba(255,93,93,.05),var(--panel))}
+  .traps .ehead{padding:13px 16px;border-bottom:1px solid #3a2020;display:flex;align-items:center;gap:9px}
+  .traps .ehead .pixel{font-size:11px;color:var(--red)}
+  .traps .ebody{padding:8px 16px 14px}
+  .traps ul{margin:0;padding-left:18px}
+  .traps li{font-size:12.5px;margin:7px 0;color:var(--text)}
+  .traps li b{color:var(--red)}
+
+  footer{margin-top:30px;text-align:center;color:var(--muted);font-size:11px}
+  .reset{margin-top:14px;background:none;border:1px solid var(--border);color:var(--muted);
+    font-family:'JetBrains Mono';font-size:11px;padding:7px 14px;border-radius:6px;cursor:pointer}
+  .reset:hover{border-color:var(--red);color:var(--red)}
+
+  .toast{position:fixed;left:50%;top:24px;transform:translateX(-50%) translateY(-120px);
+    background:linear-gradient(180deg,#1d1809,#0e0b04);border:2px solid var(--gold);border-radius:10px;
+    padding:14px 26px;text-align:center;z-index:50;opacity:0;transition:.45s cubic-bezier(.2,1.3,.4,1);
+    box-shadow:0 0 40px -6px rgba(255,182,39,.6)}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .toast .t1{font-family:'Silkscreen';font-size:14px;color:var(--gold);text-shadow:0 0 16px rgba(255,182,39,.5)}
+  .toast .t2{font-size:12px;color:var(--text);margin-top:6px}
+</style>
+
+<div class="wrap">
+
+  <!-- CLOUD SYNC BAR -->
+  <div class="syncbar">
+    <span class="syncdot local" id="syncDot"></span>
+    <span class="syncmsg" id="syncMsg"><b>Local only.</b> Connect Google Drive to sync across devices.</span>
+    <button class="sbtn" id="setupToggle">⚙ Setup</button>
+    <button class="sbtn primary" id="connectBtn">Connect Drive</button>
+    <button class="sbtn" id="signoutBtn" style="display:none">Disconnect</button>
+  </div>
+
+  <!-- SETUP PANEL -->
+  <section class="setup" id="setupPanel">
+    <div class="sh"><span class="pixel">⚙ One-time Google Drive setup</span></div>
+    <div class="sb">
+      <ol>
+        <li>Open the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> and create a project (or pick one).</li>
+        <li>Go to <b>APIs &amp; Services → Library</b>, search <code>Google Drive API</code>, click <b>Enable</b>.</li>
+        <li>Go to <b>APIs &amp; Services → OAuth consent screen</b>. Choose <b>External</b>, fill the app name + your email, and under <b>Test users</b> add your own Google address (this lets you use it without Google verification).</li>
+        <li>Go to <b>APIs &amp; Services → Credentials → Create credentials → OAuth client ID</b>. Application type: <b>Web application</b>.</li>
+        <li>Under <b>Authorized JavaScript origins</b> add the exact address you'll open this from — e.g. <code>http://localhost:8000</code>, or your hosting URL like <code>https://yourname.github.io</code>. No trailing slash.</li>
+        <li>Click <b>Create</b>, copy the <b>Client ID</b>, and paste it below.</li>
+      </ol>
+      <div class="cidrow">
+        <input type="text" id="clientIdInput" placeholder="xxxxxxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        <button class="sbtn primary" id="saveClientId">Save Client ID</button>
+      </div>
+      <div class="note">
+        Privacy: the app requests the <code>drive.appdata</code> scope only — it can read/write <b>one hidden file</b> it creates (<code>ai-quest-save.json</code>) and can't see anything else in your Drive. Your progress is locked behind your own Google sign-in, so even if this HTML file is hosted publicly, no one but you can see your save. This sync only runs when the file is served from a registered origin (localhost or a host) — not inside a preview.
+      </div>
+    </div>
+  </section>
+
+  <!-- HEADER -->
+  <header class="hud">
+    <div class="game-title pixel">⚔ Path of the AI Architect</div>
+    <div class="game-sub">Senior Engineer → AI Engineer → Founder-CTO &nbsp;//&nbsp; a 4-Act campaign</div>
+    <div class="charline">
+      <div class="lvl-badge">
+        <div class="lvl-num" id="lvlNum">1</div>
+        <div class="lvl-meta"><div class="pixel">LEVEL</div><div class="rank" id="rankName">Apprentice</div></div>
+      </div>
+      <div class="streak"><div class="flame" id="streakNum">0</div><small>🔥 Day Streak</small></div>
+    </div>
+    <div class="xpwrap">
+      <div class="xprow"><span>XP <b id="xpCur">0</b> / <span id="xpNext">600</span></span><span id="xpTotal">Total: 0 XP</span></div>
+      <div class="xpbar"><div class="xpfill" id="xpFill"></div></div>
+    </div>
+  </header>
+
+  <!-- WEEKLY ENGINE -->
+  <section class="engine">
+    <div class="ehead"><span class="pixel">↻ The Weekly Engine — your repeatable loop</span></div>
+    <div class="ebody">
+      <div class="loop">
+        <div class="lcard"><div class="d">MON–FRI</div><p>Ship code 5 days. Don't break the chain — even 30 mins counts.</p></div>
+        <div class="lcard"><div class="d">BUILD BLOCK</div><p>One deep session advancing your current project.</p></div>
+        <div class="lcard"><div class="d">LEARN BLOCK</div><p>One focused study session on the week's concept.</p></div>
+        <div class="lcard"><div class="d">PUBLISH</div><p>One public post on what you built/learned (build-in-public).</p></div>
+        <div class="lcard"><div class="d">SUN · SAVE POINT</div><p>Review the week, tick quests, plan the next 7 days.</p></div>
+      </div>
+      <button class="logbtn" id="logBtn">+ LOG TODAY'S PROGRESS &nbsp;(keep the streak alive)</button>
+    </div>
+  </section>
+
+  <div id="acts"></div>
+
+  <!-- TRAPS -->
+  <section class="traps">
+    <div class="ehead"><span class="pixel">☠ Traps — instant run-enders, avoid at all costs</span></div>
+    <div class="ebody">
+      <ul>
+        <li><b>Tutorial Hell:</b> watching courses without shipping. Rule: never finish a learning block without writing or running code.</li>
+        <li><b>Framework Chasing:</b> the tooling turns over every few months. Anchor on concepts; treat frameworks as disposable gear.</li>
+        <li><b>The Forever-Prototype:</b> nothing reaches production. A project doesn't count until someone other than you depends on it.</li>
+        <li><b>Skipping Act III:</b> staying purely technical. The CTO title is an org/business problem — the leadership and commercial quests are not optional side-content.</li>
+        <li><b>Generalist Mush:</b> "we help you adopt AI" is what everyone says. Pick a vertical or problem-type and become known for it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <div>Progress saves locally and syncs to your Google Drive when connected. Long-term Acts unlock as you clear the ones before them.</div>
+    <button class="reset" id="resetBtn">⟲ Reset campaign</button>
+  </footer>
+</div>
+
+<div class="toast" id="toast"><div class="t1" id="toastT1">LEVEL UP!</div><div class="t2" id="toastT2"></div></div>
+
+<script>
+// ===========================================================================
+// CAMPAIGN DATA
+// ===========================================================================
+const RANKS=[{min:0,name:"Apprentice"},{min:600,name:"Initiate Builder"},{min:1600,name:"AI Engineer"},
+{min:3000,name:"Field Consultant"},{min:4800,name:"Delivery Lead"},{min:7000,name:"AI Strategist"},{min:9500,name:"Founder-CTO"}];
+function rankFor(xp){let r=RANKS[0];for(const x of RANKS){if(xp>=x.min)r=x;}return r.name;}
+function levelInfo(xp){let lvl=1,base=0,need=600;while(xp>=base+need){base+=need;lvl++;need=Math.round(need*1.18);}return{lvl,into:xp-base,need,total:xp};}
+
+const ACTS=[
+{zone:"ACT I · MONTHS 1–6",name:"The Apprentice",when:"Become a genuinely good AI Engineer. Weekly quests — this is your grind zone.",locked:false,months:[
+ {label:"Month 1 — LLM Fundamentals & First RAG",quests:[
+  {t:"W1 · Forge your LLM mental model",xp:120,obj:"Understand how models actually work, well enough to reason about failure modes.",
+   look:["Search: <code>how LLMs work tokenization embeddings</code>","Read official Anthropic & OpenAI docs on context windows, temperature, sampling","Search: <code>why do LLMs hallucinate</code>"],
+   win:"You publish a 1-page explainer (your own words) covering tokens, embeddings, context window, temperature, and why hallucinations happen."},
+  {t:"W2 · First API calls + structured output",xp:120,obj:"Build a CLI tool that calls an LLM, handles errors, and returns validated JSON.",
+   look:["Search: <code>LLM structured output JSON schema</code>","Search: <code>function calling tool use docs</code>"],
+   win:"Tool runs, validates output against a schema, and recovers gracefully from one forced failure."},
+  {t:"W3 · Embeddings & semantic search",xp:120,obj:"Build semantic search over ~100 of your own documents.",
+   look:["Search: <code>embedding models comparison</code>","Search: <code>vector database getting started</code>"],
+   win:"A query returns relevant chunks, and you can explain in writing why you chose your chunking approach."},
+  {t:"W4 · Build your first real RAG",xp:160,obj:"RAG over a genuinely messy document set, not a toy.",
+   look:["Search: <code>RAG chunking strategies</code>","Search: <code>hybrid search semantic keyword reranking</code>"],
+   win:"It answers questions over real docs AND you can show one case where naive retrieval failed and how you fixed it."}]},
+ {label:"Month 2 — Evaluation Mastery (your #1 differentiator)",quests:[
+  {t:"W5 · Build an eval set",xp:140,obj:"Create a labeled benchmark for your RAG. This is the skill that separates pros from tinkerers.",
+   look:["Search: <code>LLM evaluation methods</code>","Search: <code>RAG evaluation metrics</code>"],
+   win:"You have 20–50 labeled test cases + a script that scores your system automatically."},
+  {t:"W6 · Regression + LLM-as-judge",xp:140,obj:"Measure quality changes with numbers, not vibes.",
+   look:["Search: <code>LLM as a judge best practices</code>","Search: <code>prompt regression testing</code>"],
+   win:"You change one prompt and your eval reports the quality delta numerically."},
+  {t:"W7 · Observability & tracing",xp:130,obj:"See every step, token, and cost of a request.",
+   look:["Search: <code>LLM observability tracing tools</code>"],
+   win:"You have a dashboard/trace showing the full lifecycle and cost of a single request."},
+  {t:"W8 · Cost & latency optimization",xp:140,obj:"Make your RAG cheaper or faster without losing quality.",
+   look:["Search: <code>reduce LLM cost latency techniques</code>","Search: <code>prompt caching semantic caching</code>"],
+   win:"You cut cost OR latency by a measurable % with your eval proving quality held. Document before/after."}]},
+ {label:"Month 3 — Agents",quests:[
+  {t:"W9 · Tool / function calling",xp:130,obj:"An agent that correctly calls 2–3 tools to complete a task.",
+   look:["Search: <code>function calling tutorial</code>","Search: <code>agent tool use patterns</code>"],
+   win:"Agent reliably selects and calls the right tools for a defined task."},
+  {t:"W10 · Multi-step orchestration",xp:150,obj:"An agent that completes a genuine multi-step task end-to-end.",
+   look:["Search: <code>agent orchestration patterns</code>","Search: <code>ReAct planning agents</code>"],
+   win:"Agent finishes a real multi-step workflow without you hand-holding each step."},
+  {t:"W11 · Failure modes & guardrails",xp:130,obj:"Learn when agents are a liability, and how to contain them.",
+   look:["Search: <code>AI agent failure modes</code>","Search: <code>LLM guardrails validation</code>"],
+   win:"You document 3 failure modes you actually hit and how you mitigated each."},
+  {t:"W12 · Agent project #2 (portfolio)",xp:170,obj:"An agent that automates a real workflow you or someone else uses.",
+   look:["Pick a repetitive task from your own week","Search: <code>build production AI agent</code>"],
+   win:"The agent is used for a real task — by you or someone else — not just demoed once."}]},
+ {label:"Month 4 — The Production Loop + ML Literacy",quests:[
+  {t:"W13 · Deploy for real",xp:140,obj:"Get a project live behind a real endpoint/URL.",
+   look:["Search: <code>deploy AI app hosting</code>","Search: <code>serverless LLM app deployment</code>"],
+   win:"Project is live and reachable by someone other than you."},
+  {t:"W14 · Monitoring + prod guardrails",xp:140,obj:"Watch usage, cost, errors live; validate inputs and outputs.",
+   look:["Search: <code>LLM app monitoring production</code>","Search: <code>input output validation LLM</code>"],
+   win:"A live dashboard tracks usage/cost/errors and validation is enforced in production."},
+  {t:"W15 · Fine-tuning literacy",xp:130,obj:"Know when to fine-tune — and (usually) when NOT to. Saves future clients real money.",
+   look:["Search: <code>LoRA fine-tuning when worth it</code>","Search: <code>fine-tuning vs RAG vs prompting</code>"],
+   win:"You write a decision guide (fine-tune vs RAG vs prompt) AND run one small fine-tune so you've done it once."},
+  {t:"W16 · ML fundamentals crash course",xp:120,obj:"Enough ML to never be fooled by hype or bad metrics.",
+   look:["Search: <code>supervised learning overfitting train test split</code>","Search: <code>precision recall F1 explained</code>"],
+   win:"You can explain overfitting, train/test split, and what F1/precision/recall mean — in writing, to a non-expert."}]},
+ {label:"Month 5 — The Boss Project (portfolio centerpiece)",quests:[
+  {t:"W17–20 · Build ONE production-grade system",xp:260,obj:"Full loop in one project: real problem → RAG and/or agent → evals → deployed → monitored → cost-tracked → guardrails.",
+   look:["Reuse everything from W1–W16","Search: <code>production LLM application architecture</code>"],
+   win:"It's LIVE, has an eval harness, tracks cost, has guardrails — and you publish a case study with before/after metrics + a short demo video."}]},
+ {label:"Month 6 — Prove It & Claim the Title",quests:[
+  {t:"W21 · Package your portfolio",xp:120,obj:"A page showing 3 projects, each as problem → solution → metrics.",
+   look:["Search: <code>AI engineer portfolio examples</code>"],
+   win:"A shareable portfolio page exists with all 3 projects and quantified outcomes."},
+  {t:"W22 · Reframe your identity",xp:110,obj:"Reposition from 'senior SWE' to 'AI Engineer' everywhere.",
+   look:["Search: <code>AI engineer job description skills</code>"],
+   win:"Profile/CV updated; you can pitch your AI-engineer value in 30 seconds out loud."},
+  {t:"W23 · Get real stakes",xp:140,obj:"Land internal AI work OR your first paid/freelance AI task.",
+   look:["Volunteer for AI initiatives at your current job","Search: <code>freelance AI engineer first client</code>"],
+   win:"You're assigned or have landed at least one AI task where the outcome actually matters to someone."},
+  {t:"⚔ BOSS · Defend Your Work",xp:500,boss:true,obj:"Ship AI for real stakes that someone else relies on. This kill confirms you ARE an AI Engineer.",
+   look:["No new search — execute everything you've learned"],
+   win:"ALL true: (1) given a vague business ask you can decide if AI fits, design it, ship it, prove it with numbers; (2) ≥3 portfolio projects, ≥1 in production used by others; (3) you talk evals fluently; (4) you've been paid OR your employer relies on AI you built."}]}
+]},
+{zone:"ACT II · MONTHS 4–18 (overlaps)",name:"The Journeyman",when:"Develop the consulting muscle: turn business problems into AI solutions that survive reality.",locked:true,months:[
+ {label:"Months 7–9 — First Engagement",quests:[
+  {t:"Choose your niche",xp:160,obj:"Pick a vertical or problem-type to become known for. Generalists drown.",
+   look:["Search: <code>profitable AI consulting niches</code>","List industries/workflows you already understand deeply"],
+   win:"You've written one sentence: 'I help [who] do [what] with AI' — specific enough to exclude most companies."},
+  {t:"Define your offer & scope a real problem",xp:180,obj:"Turn 'we want AI' into a defined deliverable with success criteria.",
+   look:["Search: <code>scoping AI consulting project</code>","Search: <code>statement of work AI project</code>"],
+   win:"A written scope for a real prospect: deliverable, success metric, timeline, price."},
+  {t:"⚔ BOSS · Deliver engagement #1",xp:550,boss:true,obj:"Complete one paid engagement with a measurable result.",
+   look:["Convert internal work to a documented win if no external client yet"],
+   win:"One paid engagement delivered + a public case study with a quantified before/after outcome."}]},
+ {label:"Months 10–12 — Trust & the Power of No",quests:[
+  {t:"Engagement #2",xp:200,obj:"Second delivery; tighten your process.",look:["Reuse your scope template from Act II"],
+   win:"A second engagement delivered with a quantified result."},
+  {t:"Learn to say no",xp:160,obj:"Most AI requests should be solved without AI or are premature. Saying so builds huge trust.",
+   look:["Search: <code>when not to use AI for a problem</code>"],
+   win:"You have a documented case where you advised a client AGAINST AI (or against premature AI) and won trust for it."}]},
+ {label:"Months 13–18 — Repeatability & First Asset",quests:[
+  {t:"Write your delivery playbook",xp:200,obj:"A repeatable scope→build→handoff method. Consultancies die on heroic, non-repeatable delivery.",
+   look:["Search: <code>AI project delivery methodology</code>"],
+   win:"A written playbook you've personally used on two different engagements."},
+  {t:"⚔ BOSS · Build a reusable accelerator",xp:550,boss:true,obj:"Notice what you build twice and turn it into an asset.",
+   look:["Review your past engagements for repeated work"],
+   win:"One reusable template/accelerator/framework extracted from real work — AND clients refer you or return. You are now a credible AI consultant."}]}
+]},
+{zone:"ACT III · MONTHS 12–30 (overlaps)",name:"The Strategist",when:"Build the leadership + business layer engineers skip. This is the real gate to CTO.",locked:true,months:[
+ {label:"Leadership & Commercial Quests",quests:[
+  {t:"Lead a small delivery team",xp:240,obj:"Review others' work, set standards, mentor. Start on your current team or with contractors.",
+   look:["Search: <code>technical lead responsibilities</code>","Volunteer to lead the AI effort on your team"],
+   win:"You've led ≥1 team/contractor delivering AI work, reviewing their output and setting the bar."},
+  {t:"Gain commercial fluency",xp:220,obj:"Understand pricing, margins, and why scope creep kills consultancies.",
+   look:["Search: <code>consulting pricing models margins</code>","Search: <code>services business unit economics</code>"],
+   win:"You can model a project's price, cost, and margin on paper and explain it."},
+  {t:"Build a public point of view",xp:220,obj:"Thought leadership IS lead generation in consulting — and it sharpens your thinking.",
+   look:["Search: <code>building authority technical writing</code>","Pick one channel and post consistently"],
+   win:"A consistent body of writing/talks on AI delivery exists, and at least one inbound opportunity came from it."},
+  {t:"⚔ BOSS · Become a magnet",xp:600,boss:true,obj:"A visible track record that makes people seek you out.",
+   look:["Aggregate your case studies, writing, and leadership wins"],
+   win:"You've led ≥1 team delivering AI AND have a public track record generating inbound interest. You think like a CTO now, not just an engineer."}]}
+]},
+{zone:"ACT IV · MONTHS 24–48",name:"The Founder-CTO",when:"Found your company (fastest path) or ascend at an early-stage firm. Win condition of the campaign.",locked:true,months:[
+ {label:"The Endgame",quests:[
+  {t:"Find your complementary co-founder",xp:300,obj:"Someone strong where you're weak: sales, client relationships, business development.",
+   look:["Search: <code>finding a co-founder business partner</code>","Network in your chosen niche"],
+   win:"You're in serious partnership talks (or partnered) with someone who owns the commercial side."},
+  {t:"Validate with paying clients (side practice)",xp:320,obj:"Start the firm as a side practice while employed. Prove demand before quitting on hope.",
+   look:["Search: <code>starting a consulting firm side business</code>"],
+   win:"The practice has paying clients and recurring/repeat revenue while you're still employed."},
+  {t:"Push toward owning IP",xp:300,obj:"Move from selling hours toward reusable products/accelerators — your moat.",
+   look:["Search: <code>productizing a consulting firm</code>"],
+   win:"At least one offering is productized (sold as an asset, not just hours)."},
+  {t:"⚔ FINAL BOSS · Occupy the chair",xp:900,boss:true,obj:"Be the CTO of an AI-transformation company.",
+   look:["Either: go full-time on your firm when revenue justifies it","Or: take a CTO-track role at a fast-growing early-stage AI consultancy"],
+   win:"You own technical strategy & delivery quality, you're the technical authority in important client rooms, and you build/retain the AI team. 🏆 CAMPAIGN COMPLETE."}]}
+]}
+];
+ACTS.forEach((a,ai)=>a.months.forEach((m,mi)=>m.quests.forEach((q,qi)=>q.id=`${ai}_${mi}_${qi}`)));
+
+// ===========================================================================
+// STATE + LOCAL PERSISTENCE (localStorage, guarded → in-memory fallback)
+// ===========================================================================
+let state={done:{},streak:0,lastLog:null,openActs:{0:true},updatedAt:0};
+const LS_STATE="ai_architect_quest_v2";
+const LS_CID="ai_architect_client_id";
+const mem={};
+function lsGet(k){try{const v=localStorage.getItem(k);if(v!==null)return v;}catch(e){}return mem[k]||null;}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){mem[k]=v;}}
+function loadLocal(){const raw=lsGet(LS_STATE);if(raw){try{state=JSON.parse(raw);}catch(e){}}}
+function saveLocal(){state.updatedAt=Date.now();lsSet(LS_STATE,JSON.stringify(state));scheduleSync();}
+
+// ===========================================================================
+// GOOGLE DRIVE SYNC (GIS token model + Drive v3 REST, appDataFolder)
+// ===========================================================================
+const SCOPE="https://www.googleapis.com/auth/drive.appdata";
+const SAVE_NAME="ai-quest-save.json";
+let CLIENT_ID=lsGet(LS_CID)||"";
+let accessToken=null,tokenClient=null,driveFileId=null,connected=false,syncTimer=null;
+
+function setSync(cls,msg){document.getElementById('syncDot').className='syncdot '+cls;document.getElementById('syncMsg').innerHTML=msg;}
+
+function initTokenClient(){
+  if(!window.google||!google.accounts||!google.accounts.oauth2){setSync('error','<b>Google library not loaded.</b> Serve this from a registered origin (not a preview), then retry.');return false;}
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:CLIENT_ID,scope:SCOPE,
+    callback:(resp)=>{if(resp&&resp.access_token){accessToken=resp.access_token;onConnected();}},
+    error_callback:(err)=>{setSync('error','<b>Sign-in cancelled or blocked.</b> Check your Client ID & that this origin is authorized.');console.warn(err);}
+  });
+  return true;
+}
+function connectDrive(){
+  if(!CLIENT_ID){document.getElementById('setupPanel').classList.add('show');setSync('error','<b>Add your Client ID first</b> (Setup panel).');return;}
+  setSync('connecting','Connecting to Google Drive…');
+  if(!tokenClient&&!initTokenClient())return;
+  tokenClient.requestAccessToken({prompt:accessToken?'':'consent'});
+}
+async function onConnected(){
+  connected=true;
+  document.getElementById('connectBtn').style.display='none';
+  document.getElementById('signoutBtn').style.display='';
+  setSync('connecting','Loading your save from Drive…');
+  try{
+    const remote=await driveFindAndLoad();
+    if(remote&&typeof remote.updatedAt==='number'&&remote.updatedAt>=(state.updatedAt||0)){
+      state=remote;saveLocalSilent();render();
+    }else{
+      await driveSaveNow(); // push local up (first time / local newer)
+    }
+    setSync('synced','<b>Synced.</b> Progress saves to your Drive automatically.');
+  }catch(e){console.warn(e);setSync('error','<b>Sync error.</b> '+(e.message||'Could not reach Drive.'));}
+}
+function disconnectDrive(){
+  try{if(accessToken)google.accounts.oauth2.revoke(accessToken,()=>{});}catch(e){}
+  accessToken=null;connected=false;driveFileId=null;
+  document.getElementById('connectBtn').style.display='';
+  document.getElementById('signoutBtn').style.display='none';
+  setSync('local','<b>Disconnected.</b> Still saving locally on this device.');
+}
+function saveLocalSilent(){try{localStorage.setItem(LS_STATE,JSON.stringify(state));}catch(e){mem[LS_STATE]=JSON.stringify(state);}}
+
+async function driveFetch(url,opts,retry=true){
+  opts=opts||{};opts.headers=Object.assign({Authorization:'Bearer '+accessToken},opts.headers||{});
+  const res=await fetch(url,opts);
+  if(res.status===401&&retry){ // token expired → refresh once
+    await new Promise((resolve,reject)=>{
+      tokenClient.callback=(r)=>{if(r&&r.access_token){accessToken=r.access_token;resolve();}else reject(new Error('reauth failed'));};
+      tokenClient.requestAccessToken({prompt:''});
+    });
+    return driveFetch(url,opts,false);
+  }
+  return res;
+}
+async function driveFindAndLoad(){
+  const q=encodeURIComponent("name='"+SAVE_NAME+"'");
+  const res=await driveFetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q="+q+"&fields=files(id,modifiedTime)");
+  const data=await res.json();
+  if(data.files&&data.files.length){
+    driveFileId=data.files[0].id;
+    const dl=await driveFetch("https://www.googleapis.com/drive/v3/files/"+driveFileId+"?alt=media");
+    return await dl.json();
+  }
+  return null;
+}
+async function driveSaveNow(){
+  if(!connected||!accessToken)return;
+  setSync('syncing','Syncing…');
+  const body=JSON.stringify(state);
+  try{
+    if(driveFileId){
+      await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+driveFileId+"?uploadType=media",
+        {method:'PATCH',headers:{'Content-Type':'application/json'},body});
+    }else{
+      const meta={name:SAVE_NAME,parents:['appDataFolder']};
+      const form=new FormData();
+      form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+      form.append('file',new Blob([body],{type:'application/json'}));
+      const res=await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:'POST',body:form});
+      const j=await res.json();driveFileId=j.id;
+    }
+    const t=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    setSync('synced','<b>Synced</b> at '+t+'.');
+  }catch(e){console.warn(e);setSync('error','<b>Sync error.</b> Saved locally; will retry on next change.');}
+}
+function scheduleSync(){if(!connected)return;clearTimeout(syncTimer);syncTimer=setTimeout(driveSaveNow,1400);}
+
+// ===========================================================================
+// XP / RENDER
+// ===========================================================================
+function totalXP(){let xp=0;ACTS.forEach(a=>a.months.forEach(m=>m.quests.forEach(q=>{if(state.done[q.id])xp+=q.xp;})));return xp;}
+function actDone(ai){let d=0,t=0;ACTS[ai].months.forEach(m=>m.quests.forEach(q=>{t++;if(state.done[q.id])d++;}));return{d,t};}
+function actUnlocked(ai){if(ai===0)return true;const prev=ACTS[ai-1];let ok=true,any=false;prev.months.forEach(m=>m.quests.forEach(q=>{if(q.boss){any=true;if(!state.done[q.id])ok=false;}}));return any?ok:false;}
+let prevLevel=1;
+function render(){
+  const xp=totalXP(),li=levelInfo(xp);
+  document.getElementById('lvlNum').textContent=li.lvl;
+  document.getElementById('rankName').textContent=rankFor(xp);
+  document.getElementById('xpCur').textContent=li.into;
+  document.getElementById('xpNext').textContent=li.need;
+  document.getElementById('xpTotal').textContent='Total: '+xp+' XP';
+  document.getElementById('xpFill').style.width=Math.min(100,(li.into/li.need)*100)+'%';
+  document.getElementById('streakNum').textContent=state.streak;
+  const root=document.getElementById('acts');root.innerHTML='';
+  ACTS.forEach((a,ai)=>{
+    const unlocked=actUnlocked(ai),{d,t}=actDone(ai),open=!!state.openActs[ai]&&unlocked;
+    const el=document.createElement('section');el.className='act'+(open?' open':'')+(unlocked?'':' locked');
+    let body='';
+    if(!unlocked){body=`<div class="act-body" style="display:block"><div class="lockmsg">🔒 Locked — defeat the boss of the previous Act to unlock this zone.</div></div>`;}
+    else{let inner='';a.months.forEach(m=>{inner+=`<div class="month-label">${m.label}</div>`;m.quests.forEach(q=>{const dn=!!state.done[q.id];
+      inner+=`<div class="quest${q.boss?' boss':''}${dn?' done':''}" data-id="${q.id}">
+        <div class="q-head" data-toggle="${q.id}"><div class="check" data-check="${q.id}">✓</div>
+        <div class="q-main"><div class="q-title">${q.boss?'<span class="tag boss">BOSS</span>':''}${q.t}<span class="tag xp">+${q.xp} XP</span></div>
+        <div class="q-obj">${q.obj}</div></div><div class="q-toggle">▶</div></div>
+        <div class="q-detail">
+          <div class="dsec look"><div class="dlabel">⌕ Where to look</div><ul>${q.look.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+          <div class="dsec win"><div class="dlabel">✓ Victory condition — how you confirm it's cleared</div><div class="win-box">${q.win}</div></div>
+        </div></div>`;});});body=`<div class="act-body">${inner}</div>`;}
+    el.innerHTML=`<div class="act-head" data-act="${ai}"><span class="chev">▶</span>
+      <div><div class="act-zone">${a.zone}</div><div class="act-name">${a.name}</div><div class="act-when">${a.when}</div></div>
+      <div class="act-prog"><div class="pct">${unlocked?Math.round(d/t*100)+'%':'🔒'}</div><div class="cnt">${d}/${t} quests</div></div></div>${body}`;
+    root.appendChild(el);
+  });
+  if(li.lvl>prevLevel)showToast('LEVEL '+li.lvl+'!','New rank: '+rankFor(xp));
+  prevLevel=li.lvl;
+}
+function showToast(t1,t2){const to=document.getElementById('toast');document.getElementById('toastT1').textContent=t1;document.getElementById('toastT2').textContent=t2;to.classList.add('show');setTimeout(()=>to.classList.remove('show'),2600);}
+
+// ===========================================================================
+// EVENTS
+// ===========================================================================
+document.getElementById('acts').addEventListener('click',(e)=>{
+  const actHead=e.target.closest('[data-act]'),checkEl=e.target.closest('[data-check]'),toggleEl=e.target.closest('[data-toggle]');
+  if(checkEl){e.stopPropagation();const id=checkEl.getAttribute('data-check');if(state.done[id])delete state.done[id];else state.done[id]=true;saveLocal();render();return;}
+  if(toggleEl){toggleEl.closest('.quest').classList.toggle('expanded');return;}
+  if(actHead){const ai=actHead.getAttribute('data-act');if(!actUnlocked(+ai))return;state.openActs[ai]=!state.openActs[ai];saveLocal();render();}
+});
+document.getElementById('logBtn').addEventListener('click',()=>{
+  const today=new Date().toDateString();if(state.lastLog===today)return;
+  const y=new Date(Date.now()-864e5).toDateString();state.streak=(state.lastLog===y)?state.streak+1:1;state.lastLog=today;saveLocal();
+  const btn=document.getElementById('logBtn');btn.classList.add('done');btn.textContent='✓ LOGGED — streak: '+state.streak+' day'+(state.streak>1?'s':'');
+  document.getElementById('streakNum').textContent=state.streak;showToast('+1 DAY','Streak: '+state.streak+". Don't break the chain.");
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(!confirm('Reset all progress, XP and streak on this device? (If connected, the cleared save also syncs to Drive.)'))return;
+  state={done:{},streak:0,lastLog:null,openActs:{0:true},updatedAt:Date.now()};prevLevel=1;saveLocal();render();
+  const btn=document.getElementById('logBtn');btn.className='logbtn';btn.textContent="+ LOG TODAY'S PROGRESS  (keep the streak alive)";
+});
+document.getElementById('setupToggle').addEventListener('click',()=>document.getElementById('setupPanel').classList.toggle('show'));
+document.getElementById('connectBtn').addEventListener('click',connectDrive);
+document.getElementById('signoutBtn').addEventListener('click',disconnectDrive);
+document.getElementById('saveClientId').addEventListener('click',()=>{
+  const v=document.getElementById('clientIdInput').value.trim();
+  if(!v){setSync('error','<b>Paste your Client ID first.</b>');return;}
+  CLIENT_ID=v;lsSet(LS_CID,v);tokenClient=null;
+  setSync('local','<b>Client ID saved.</b> Click “Connect Drive” to sign in.');
+});
+
+// ===========================================================================
+// BOOT
+// ===========================================================================
+(function(){
+  loadLocal();prevLevel=levelInfo(totalXP()).lvl;render();
+  if(CLIENT_ID)document.getElementById('clientIdInput').value=CLIENT_ID;
+  if(state.lastLog===new Date().toDateString()){const btn=document.getElementById('logBtn');btn.classList.add('done');btn.textContent='✓ LOGGED — streak: '+state.streak+' day'+(state.streak>1?'s':'');}
+  if(!CLIENT_ID)setSync('local','<b>Local only.</b> Open Setup to enable Google Drive sync across devices.');
+  else setSync('local','<b>Ready.</b> Click “Connect Drive” to sync this device.');
+})();
+</script>
+</html>
